@@ -9,7 +9,7 @@ async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 10
 
 @router.get("/")
 async def get_users():
-    return jsonable_encoder(["Alice", "Bob"])
+    return jsonable_encoder(["shuvam", "dutta"])
 
 @router.get("/{user_id}")
 async def get_user(user_id: int):
