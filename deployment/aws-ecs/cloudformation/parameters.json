@@ -1,0 +1,62 @@
+[
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "fastapi-app"
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "ContainerImage",
+    "ParameterValue": "471112788023.dkr.ecr.ap-south-1.amazonaws.com/fastapi-app:latest"
+  },
+  {
+    "ParameterKey": "ContainerPort",
+    "ParameterValue": "8000"
+  },
+  {
+    "ParameterKey": "HealthCheckPath",
+    "ParameterValue": "/health"
+  },
+  {
+    "ParameterKey": "TaskCpu",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "TaskMemory",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "DesiredCount",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "MinCapacity",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "MaxCapacity",
+    "ParameterValue": "10"
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": "vpc-0dd7c12eb9463ad34"
+  },
+  {
+    "ParameterKey": "Subnet1Id",
+    "ParameterValue": "subnet-009e8906316f5539e"
+  },
+  {
+    "ParameterKey": "Subnet2Id",
+    "ParameterValue": "subnet-0e016cdc991995592"
+  },
+  {
+    "ParameterKey": "LogRetentionDays",
+    "ParameterValue": "7"
+  },
+  {
+    "ParameterKey": "CloudFrontPriceClass",
+    "ParameterValue": "PriceClass_All"
+  }
+]
