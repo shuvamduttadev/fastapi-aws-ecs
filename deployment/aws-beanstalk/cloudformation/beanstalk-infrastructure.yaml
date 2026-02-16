@@ -1,0 +1,288 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'FastAPI on AWS Elastic Beanstalk with Application Load Balancer'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: fastapi-app
+    Description: Project name for resource naming
+    AllowedPattern: ^[a-z0-9-]+$
+
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.micro
+      - t3.small
+      - t3.medium
+    Description: EC2 instance type
+
+  MinInstances:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 10
+    Description: Minimum number of instances
+
+  MaxInstances:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    MaxValue: 20
+    Description: Maximum number of instances
+
+  AppVersion:
+    Type: String
+    Default: v1.0.0
+    Description: Initial application version label
+
+  PythonVersion:
+    Type: String
+    Default: '3.11'
+    AllowedValues:
+      - '3.9'
+      - '3.10'
+      - '3.11'
+    Description: Python version
+
+  DeploymentPolicy:
+    Type: String
+    Default: Rolling
+    AllowedValues:
+      - AllAtOnce
+      - Rolling
+      - RollingWithAdditionalBatch
+      - Immutable
+    Description: Deployment policy
+
+Resources:
+  # ==========================================
+  # S3 Bucket for Application Versions
+  # ==========================================
+
+  ApplicationBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-versions-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-versions
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ==========================================
+  # IAM Roles
+  # ==========================================
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ec2-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-ec2-role
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${ProjectName}-instance-profile
+      Roles:
+        - !Ref EC2Role
+
+  ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-service-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: elasticbeanstalk.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: elasticbeanstalk
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkEnhancedHealth
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-service-role
+
+  # ==========================================
+  # Elastic Beanstalk Application
+  # ==========================================
+
+  BeanstalkApplication:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Sub ${ProjectName}-app
+      Description: !Sub ${ProjectName} FastAPI Application
+
+  # ==========================================
+  # Application Version
+  # ==========================================
+
+  BeanstalkApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName: !Ref BeanstalkApplication
+      Description: !Sub Version ${AppVersion}
+      SourceBundle:
+        S3Bucket: !Ref ApplicationBucket
+        S3Key: !Sub ${ProjectName}-${AppVersion}.zip
+
+  # ==========================================
+  # Configuration Template
+  # ==========================================
+
+  ConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref BeanstalkApplication
+      Description: Default Configuration
+      SolutionStackName: !Sub '64bit Amazon Linux 2023 v4.3.2 running Python ${PythonVersion}'
+      OptionSettings:
+        # Environment
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: LoadBalanced
+        
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: !Ref ServiceRole
+
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: LoadBalancerType
+          Value: application
+
+        # Instances
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: InstanceType
+          Value: !Ref InstanceType
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref EC2InstanceProfile
+
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: !Ref MinInstances
+
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: !Ref MaxInstances
+
+        # Health
+        - Namespace: aws:elasticbeanstalk:healthreporting:system
+          OptionName: SystemType
+          Value: enhanced
+
+        - Namespace: aws:elasticbeanstalk:environment:process:default
+          OptionName: HealthCheckPath
+          Value: /health
+
+        # Deployment
+        - Namespace: aws:elasticbeanstalk:command
+          OptionName: DeploymentPolicy
+          Value: !Ref DeploymentPolicy
+
+        # Environment Variables
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: ENVIRONMENT
+          Value: !Ref EnvironmentName
+
+        # Logs
+        - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+          OptionName: StreamLogs
+          Value: 'true'
+
+        - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+          OptionName: RetentionInDays
+          Value: '7'
+
+  # ==========================================
+  # Beanstalk Environment
+  # ==========================================
+
+  BeanstalkEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      EnvironmentName: !Sub ${ProjectName}-${EnvironmentName}
+      ApplicationName: !Ref BeanstalkApplication
+      Description: !Sub ${ProjectName} ${EnvironmentName} Environment
+      TemplateName: !Ref ConfigurationTemplate
+      VersionLabel: !Ref BeanstalkApplicationVersion
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+# ==========================================
+# Outputs
+# ==========================================
+
+Outputs:
+  ApplicationName:
+    Description: Application Name
+    Value: !Ref BeanstalkApplication
+
+  EnvironmentName:
+    Description: Environment Name
+    Value: !Ref BeanstalkEnvironment
+
+  EnvironmentURL:
+    Description: Environment URL
+    Value: !GetAtt BeanstalkEnvironment.EndpointURL
+
+  ApplicationURL:
+    Description: Application URL
+    Value: !Sub http://${BeanstalkEnvironment.EndpointURL}
+
+  HealthCheckURL:
+    Description: Health Check URL
+    Value: !Sub http://${BeanstalkEnvironment.EndpointURL}/health
+
+  APIDocsURL:
+    Description: API Docs URL
+    Value: !Sub http://${BeanstalkEnvironment.EndpointURL}/docs
+
+  ApplicationBucket:
+    Description: S3 Bucket
+    Value: !Ref ApplicationBucket

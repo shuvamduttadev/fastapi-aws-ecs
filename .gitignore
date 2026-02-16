@@ -21,4 +21,5 @@ venv/
 .env
 
 lambda_package/
-lambda-deployment-package.zip
+*.zip
+

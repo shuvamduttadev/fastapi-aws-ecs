@@ -1,0 +1,34 @@
+[
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "fastapi-app"
+  },
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t3.micro"
+  },
+  {
+    "ParameterKey": "MinInstances",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "MaxInstances",
+    "ParameterValue": "4"
+  },
+  {
+    "ParameterKey": "AppVersion",
+    "ParameterValue": "v1.0.0"
+  },
+  {
+    "ParameterKey": "PythonVersion",
+    "ParameterValue": "3.11"
+  },
+  {
+    "ParameterKey": "DeploymentPolicy",
+    "ParameterValue": "Rolling"
+  }
+]
