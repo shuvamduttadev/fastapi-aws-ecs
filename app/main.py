@@ -7,7 +7,7 @@ from app.utils.rate_limiter import limiter
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -109,7 +109,7 @@ def health_check():
                 "message": f"Service is unhealthy: {str(e)}",
                 "version": "1.0.0",
                 "database": "disconnected",
-                "timestamp": datetime.utcnow()
+                "timestamp": datetime.now(timezone.utc)
             }
         )
 
@@ -120,5 +120,5 @@ def api_status():
     return {
         "status": "operational",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc)
     }
